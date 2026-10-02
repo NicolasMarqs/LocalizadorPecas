@@ -11,8 +11,14 @@ const supabase = createClient(
     process.env.SUPABASE_SERVICE_KEY
 );
 
+const formidable = require("formidable");
+const XLSX = require("xlsx");
+
+const PORTA = process.env.PORT || 3000;
+const SENHA_ADMIN = process.env.SENHA_ADMIN;
+
 async function testarSupabase() {
-    const { data, error } = await supabase
+    const { error } = await supabase
         .from("pecas")
         .select("*")
         .limit(1);
@@ -24,207 +30,469 @@ async function testarSupabase() {
     }
 }
 
-testarSupabase();   
-
-const formidable = require("formidable");
-const XLSX = require("xlsx");
-
-
-const PORTA = process.env.PORT || 3000;
-const SENHA_ADMIN = process.env.SENHA_ADMIN;
+testarSupabase();
 
 const servidor = http.createServer(async (req, res) => {
 
-if (req.method === "GET" && req.url.startsWith("/api/peca?codigo=")) {
+    // =====================================================
+    // CONSULTAR PEÇA
+    // =====================================================
 
-    const codigo = decodeURIComponent(
-        req.url.split("codigo=")[1] || ""
-    ).trim();
+    if (req.method === "GET" && req.url.startsWith("/api/peca?codigo=")) {
 
-    const { data, error } = await supabase
-        .from("pecas")
-        .select("codigo, descricao, local")
-        .eq("codigo", codigo);
+        const codigo = decodeURIComponent(
+            req.url.split("codigo=")[1] || ""
+        ).trim();
 
-    res.writeHead(error ? 500 : 200, {
-        "Content-Type": "application/json; charset=utf-8"
-    });
+        const { data, error } = await supabase
+            .from("pecas")
+            .select("codigo, descricao, local")
+            .eq("codigo", codigo);
 
-    res.end(JSON.stringify({
-        sucesso: !error,
-        pecas: data || [],
-        erro: error ? error.message : null
-    }));
+        res.writeHead(error ? 500 : 200, {
+            "Content-Type": "application/json; charset=utf-8"
+        });
 
-    return;
-}
+        res.end(JSON.stringify({
+            sucesso: !error,
+            pecas: data || [],
+            erro: error ? error.message : null
+        }));
+
+        return;
+    }
+
+    // =====================================================
+    // VERIFICAR SENHA
+    // =====================================================
 
     if (req.method === "POST" && req.url === "/verificar-senha") {
 
-    let corpo = "";
+        let corpo = "";
 
-    req.on("data", parte => {
-        corpo += parte;
-    });
+        req.on("data", parte => {
+            corpo += parte;
+        });
 
-    req.on("end", () => {
-        const dados = JSON.parse(corpo);
+        req.on("end", () => {
 
-        if (dados.senha === SENHA_ADMIN) {
-            res.writeHead(200, {
-                "Content-Type": "application/json"
-            });
-            res.end(JSON.stringify({ correta: true }));
-        } else {
-            res.writeHead(401, {
-                "Content-Type": "application/json"
-            });
-            res.end(JSON.stringify({ correta: false }));
-        }
-    });
+            try {
 
-    return;
-}
+                const dados = JSON.parse(corpo);
 
-       if (req.method === "POST" && req.url === "/atualizar") {
+                if (dados.senha === SENHA_ADMIN) {
+
+                    res.writeHead(200, {
+                        "Content-Type": "application/json"
+                    });
+
+                    res.end(JSON.stringify({
+                        correta: true
+                    }));
+
+                } else {
+
+                    res.writeHead(401, {
+                        "Content-Type": "application/json"
+                    });
+
+                    res.end(JSON.stringify({
+                        correta: false
+                    }));
+                }
+
+            } catch (erro) {
+
+                res.writeHead(400, {
+                    "Content-Type": "application/json"
+                });
+
+                res.end(JSON.stringify({
+                    correta: false
+                }));
+            }
+        });
+
+        return;
+    }
+
+    // =====================================================
+    // ATUALIZAR BASE
+    // =====================================================
+
+    if (req.method === "POST" && req.url === "/atualizar") {
 
         const form = formidable.formidable({
             keepExtensions: true
         });
 
         form.parse(req, async (erro, campos, arquivos) => {
-            
+
             if (erro) {
-                res.writeHead(500);
+
+                res.writeHead(500, {
+                    "Content-Type": "text/plain; charset=utf-8"
+                });
+
                 res.end("Erro ao receber a planilha.");
                 return;
             }
 
             const senhaRecebida = Array.isArray(campos.senha)
-    ? campos.senha[0]
-    : campos.senha;
+                ? campos.senha[0]
+                : campos.senha;
 
-if (senhaRecebida !== SENHA_ADMIN) {
-    res.writeHead(403, {
-        "Content-Type": "text/plain; charset=utf-8"
-    });
-    res.end("Senha incorreta.");
-    return;
-}
+            if (senhaRecebida !== SENHA_ADMIN) {
 
-            console.log("Planilha recebida pelo servidor!");
+                res.writeHead(403, {
+                    "Content-Type": "text/plain; charset=utf-8"
+                });
+
+                res.end("Senha incorreta.");
+                return;
+            }
 
             const arquivoExcel = Array.isArray(arquivos.planilha)
-    ? arquivos.planilha[0]
-    : arquivos.planilha;
+                ? arquivos.planilha[0]
+                : arquivos.planilha;
 
-if (!arquivoExcel) {
-    res.writeHead(400);
-    res.end("Nenhuma planilha foi enviada.");
-    return;
-}
+            if (!arquivoExcel) {
 
-const workbook = XLSX.readFile(arquivoExcel.filepath);
+                res.writeHead(400, {
+                    "Content-Type": "text/plain; charset=utf-8"
+                });
 
-const primeiraPlanilha =
-    workbook.Sheets[workbook.SheetNames[0]];
+                res.end("Nenhuma planilha foi enviada.");
+                return;
+            }
 
-const dadosPlanilha =
-    XLSX.utils.sheet_to_json(primeiraPlanilha);
+            try {
 
-console.log("Peças encontradas:", dadosPlanilha.length);
+                console.log("Planilha recebida pelo servidor!");
 
-const linhasCSV = [
-    "codigo,descricao,local",
-    ...dadosPlanilha.map(item => {
-const codigo = String(item["Código do Item"] ?? "").trim();
-const descricao = String(item["Descrição"] ?? "").trim();
-const local = String(item["Locação"] ?? "").trim(); 
+                // ==========================================
+                // LER PLANILHA
+                // ==========================================
 
-        return `${codigo},${descricao},${local}`;
-    })
-];
+                const workbook = XLSX.readFile(
+                    arquivoExcel.filepath
+                );
 
-const pecasParaBanco = dadosPlanilha
-    .map(item => ({
-        codigo: String(item["Código do Item"] ?? "").trim(),
-        descricao: String(item["Descrição"] ?? "").trim(),
-        local: String(item["Locação"] ?? "").trim()
-    }))
-    .filter(item => item.codigo !== "");
+                const primeiraPlanilha =
+                    workbook.Sheets[
+                        workbook.SheetNames[0]
+                    ];
 
-const pecasSemDuplicados = [
-    ...new Map(
-        pecasParaBanco.map(item => [item.codigo, item])
-    ).values()
-];
+                const dadosPlanilha =
+                    XLSX.utils.sheet_to_json(
+                        primeiraPlanilha
+                    );
 
-console.log(
-    "Peças sem códigos duplicados:",
-    pecasSemDuplicados.length
-);
+                console.log(
+                    "Linhas encontradas:",
+                    dadosPlanilha.length
+                );
 
+                // ==========================================
+                // PREPARAR PEÇAS
+                // ==========================================
 
-for (let i = 0; i < pecasSemDuplicados.length; i += 1000) {
-    const lote = pecasSemDuplicados.slice(i, i + 1000);
+                const pecasParaBanco = dadosPlanilha
+                    .map(item => ({
+                        codigo: String(
+                            item["Código do Item"] ?? ""
+                        ).trim(),
 
-    const { error: erroInserir } = await supabase
-        .from("pecas")
-        .upsert(lote, { onConflict: "codigo" });
+                        descricao: String(
+                            item["Descrição"] ?? ""
+                        ).trim(),
 
-    if (erroInserir) {
-        console.log("Erro ao inserir no Supabase:", erroInserir.message);
+                        local: String(
+                            item["Locação"] ?? ""
+                        ).trim()
+                    }))
+                    .filter(item =>
+                        item.codigo !== ""
+                    );
 
-        res.writeHead(500, {
-            "Content-Type": "text/plain; charset=utf-8"
+                // Remove códigos duplicados da planilha
+                const pecasSemDuplicados = [
+                    ...new Map(
+                        pecasParaBanco.map(
+                            item => [
+                                item.codigo,
+                                item
+                            ]
+                        )
+                    ).values()
+                ];
+
+                console.log(
+                    "Peças válidas:",
+                    pecasSemDuplicados.length
+                );
+
+                // ==========================================
+                // PROTEÇÃO CONTRA PLANILHA ERRADA
+                // ==========================================
+
+                if (
+                    pecasSemDuplicados.length === 0
+                ) {
+
+                    res.writeHead(400, {
+                        "Content-Type":
+                        "text/plain; charset=utf-8"
+                    });
+
+                    res.end(
+                        "A planilha não contém peças válidas. " +
+                        "A base atual foi mantida."
+                    );
+
+                    return;
+                }
+
+                // ==========================================
+                // APAGAR BASE ANTIGA
+                // ==========================================
+
+                console.log(
+                    "Limpando base antiga..."
+                );
+
+                const {
+                    error: erroApagar
+                } = await supabase
+                    .from("pecas")
+                    .delete()
+                    .not("id", "is", null);
+
+                if (erroApagar) {
+
+                    console.log(
+                        "Erro ao limpar Supabase:",
+                        erroApagar.message
+                    );
+
+                    res.writeHead(500, {
+                        "Content-Type":
+                        "text/plain; charset=utf-8"
+                    });
+
+                    res.end(
+                        "Erro ao limpar a base antiga."
+                    );
+
+                    return;
+                }
+
+                console.log(
+                    "Base antiga removida."
+                );
+
+                // ==========================================
+                // INSERIR NOVA BASE
+                // ==========================================
+
+                let totalInserido = 0;
+
+                for (
+                    let i = 0;
+                    i < pecasSemDuplicados.length;
+                    i += 500
+                ) {
+
+                    const lote =
+                        pecasSemDuplicados.slice(
+                            i,
+                            i + 500
+                        );
+
+                    const {
+                        error: erroInserir
+                    } = await supabase
+                        .from("pecas")
+                        .insert(lote);
+
+                    if (erroInserir) {
+
+                        console.log(
+                            "Erro ao inserir:",
+                            erroInserir.message
+                        );
+
+                        res.writeHead(500, {
+                            "Content-Type":
+                            "text/plain; charset=utf-8"
+                        });
+
+                        res.end(
+                            "Erro ao gravar a nova base " +
+                            "após " +
+                            totalInserido +
+                            " peças."
+                        );
+
+                        return;
+                    }
+
+                    totalInserido +=
+                        lote.length;
+
+                    console.log(
+                        "Inseridas:",
+                        totalInserido
+                    );
+                }
+
+                // ==========================================
+                // CONFERIR QUANTIDADE NO BANCO
+                // ==========================================
+
+                const {
+                    count,
+                    error: erroContagem
+                } = await supabase
+                    .from("pecas")
+                    .select(
+                        "*",
+                        {
+                            count: "exact",
+                            head: true
+                        }
+                    );
+
+                if (erroContagem) {
+
+                    console.log(
+                        "Erro na conferência:",
+                        erroContagem.message
+                    );
+
+                    res.writeHead(500, {
+                        "Content-Type":
+                        "text/plain; charset=utf-8"
+                    });
+
+                    res.end(
+                        "A base foi enviada, mas " +
+                        "não foi possível conferir " +
+                        "a quantidade."
+                    );
+
+                    return;
+                }
+
+                if (
+                    count !==
+                    pecasSemDuplicados.length
+                ) {
+
+                    console.log(
+                        "Quantidade diferente.",
+                        "Esperado:",
+                        pecasSemDuplicados.length,
+                        "Banco:",
+                        count
+                    );
+
+                    res.writeHead(500, {
+                        "Content-Type":
+                        "text/plain; charset=utf-8"
+                    });
+
+                    res.end(
+                        "A quantidade gravada no banco " +
+                        "não corresponde à planilha."
+                    );
+
+                    return;
+                }
+
+                console.log(
+                    "Supabase atualizado:",
+                    count,
+                    "peças"
+                );
+
+                // ==========================================
+                // RESPOSTA DE SUCESSO
+                // ==========================================
+
+                res.writeHead(200, {
+                    "Content-Type":
+                    "text/plain; charset=utf-8"
+                });
+
+                res.end(
+                    `Base atualizada com sucesso: ${count} peças.`
+                );
+
+            } catch (erro) {
+
+                console.log(
+                    "Erro durante atualização:",
+                    erro
+                );
+
+                res.writeHead(500, {
+                    "Content-Type":
+                    "text/plain; charset=utf-8"
+                });
+
+                res.end(
+                    "Erro durante a atualização da base."
+                );
+            }
         });
 
-        res.end("Erro ao atualizar banco de peças.");
-        return;
-    }
-}
-
-console.log("Supabase atualizado:", pecasSemDuplicados.length, "peças");
-
-const conteudoCSV = linhasCSV.join("\n");
-
-fs.writeFileSync(
-    path.join(__dirname, "pecas.csv"),
-    conteudoCSV,
-    "utf8"
-);
-
-console.log("pecas.csv atualizado!");
-
-            res.writeHead(200, {
-                "Content-Type": "text/plain; charset=utf-8"
-            });
-
-            res.end("Planilha recebida!");
-        });
-
         return;
     }
 
-    let arquivo = req.url === "/" ? "index.html" : req.url.substring(1);
+    // =====================================================
+    // ARQUIVOS DO SITE
+    // =====================================================
 
-    const caminhoArquivo = path.join(__dirname, arquivo);
+    let arquivo =
+        req.url === "/"
+            ? "index.html"
+            : req.url.substring(1);
 
-    fs.readFile(caminhoArquivo, (erro, conteudo) => {
+    const caminhoArquivo =
+        path.join(__dirname, arquivo);
 
-        if (erro) {
-            res.writeHead(404);
-            res.end("Arquivo não encontrado");
-            return;
+    fs.readFile(
+        caminhoArquivo,
+        (erro, conteudo) => {
+
+            if (erro) {
+
+                res.writeHead(404);
+                res.end(
+                    "Arquivo não encontrado"
+                );
+
+                return;
+            }
+
+            res.writeHead(200);
+            res.end(conteudo);
         }
-
-        res.writeHead(200);
-        res.end(conteudo);
-    });
-
+    );
 });
 
-servidor.listen(PORTA, "0.0.0.0", () => {
-    console.log("Servidor do Localizador de Peças iniciado!");
-    console.log("Porta: " + PORTA);
-});
+servidor.listen(
+    PORTA,
+    "0.0.0.0",
+    () => {
+
+        console.log(
+            "Servidor do Localizador de Peças iniciado!"
+        );
+
+        console.log(
+            "Porta: " + PORTA
+        );
+    }
+);
