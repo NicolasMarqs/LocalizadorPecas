@@ -2,9 +2,14 @@
 <html lang="pt-BR">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>Localizador de Peças | Online</title>
+
+    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
     <style>
         * {
@@ -13,15 +18,16 @@
 
         body {
             margin: 0;
-            font-family: Arial, sans-serif;
-            background: #f3f4f6;
+            font-family: Arial, Helvetica, sans-serif;
+            background: #f4f5f7;
             color: #222;
         }
 
         .container {
+            width: 100%;
             max-width: 600px;
             margin: 0 auto;
-            padding: 25px 18px;
+            padding: 25px 12px 40px;
         }
 
         h1 {
@@ -31,297 +37,524 @@
 
         .subtitulo {
             text-align: center;
-            color: #666;
-            margin-bottom: 30px;
+            color: #555;
+            margin-bottom: 35px;
         }
 
-        input {
+        #codigo {
             width: 100%;
-            padding: 16px;
+            height: 55px;
+            padding: 0 16px;
             font-size: 18px;
             border: 1px solid #ccc;
             border-radius: 10px;
-            margin-bottom: 12px;
+            outline: none;
+            background: white;
         }
 
-        button {
+        #codigo:focus {
+            border-color: #222;
+        }
+
+        .btn-buscar {
             width: 100%;
-            padding: 16px;
-            font-size: 18px;
-            font-weight: bold;
-            border: none;
+            height: 53px;
+            margin-top: 12px;
+            border: 0;
             border-radius: 10px;
             background: #222;
             color: white;
+            font-size: 17px;
+            font-weight: bold;
             cursor: pointer;
         }
 
-        button:hover {
-            background: #444;
-        }
-
         #resultado {
-            margin-top: 25px;
+            margin-top: 42px;
         }
 
-        .peca {
+        .resultado-card {
             background: white;
+            border-radius: 10px;
             padding: 20px;
-            border-radius: 12px;
-            box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+            margin-bottom: 12px;
         }
 
-        .codigo {
-            font-size: 22px;
+        .resultado-card p {
+            margin: 8px 0;
+            line-height: 1.4;
+        }
+
+        .nao-encontrada {
+            background: white;
+            color: #e00022;
+            text-align: center;
+            padding: 18px;
+            border-radius: 10px;
+            font-size: 17px;
+        }
+
+        #areaAdmin {
+            margin-top: 40px;
+        }
+
+        .btn-admin {
+            width: 100%;
+            height: 53px;
+            border: 0;
+            border-radius: 10px;
+            background: #888;
+            color: white;
+            font-size: 17px;
             font-weight: bold;
+            cursor: pointer;
         }
 
-        .descricao {
-            margin-top: 8px;
+        #arquivoPlanilha {
+            display: none;
+        }
+
+        .status {
+            margin-top: 15px;
+            text-align: center;
+            font-size: 15px;
+        }
+
+        .atualizando {
             color: #555;
         }
 
-        .local {
-            margin-top: 18px;
-            padding: 15px;
-            background: #eeeeee;
-            border-radius: 8px;
-            font-size: 20px;
+        .sucesso {
+            color: #16803a;
             font-weight: bold;
         }
 
         .erro {
-            background: #fff;
-            padding: 18px;
-            border-radius: 10px;
-            color: #b00020;
-            text-align: center;
+            color: #d80020;
+            font-weight: bold;
+        }
+
+        @media (max-width: 600px) {
+            .container {
+                padding-top: 18px;
+            }
+
+            h1 {
+                font-size: 26px;
+            }
         }
     </style>
-
-   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
 </head>
 
 <body>
 
-    <div class="container">
+<div class="container">
 
-        <h1>🔎 Localizador de Peças</h1>
+    <h1>Localizador de Peças</h1>
 
-        <div class="subtitulo">
-            Consulte onde a peça está armazenada
-        </div>
-
-        <input
-            type="text"
-            id="codigo"
-            placeholder="Digite o código da peça"
-            autocomplete="off"
-        >
-
-        <button onclick="buscarPeca()">
-            BUSCAR PEÇA
-        </button>
-
-        <input
-    type="file"
-    id="arquivoExcel"
-    accept=".xlsx,.xls"
-    onchange="carregarExcel(event)"
-    style="display: none;"
->
->
-
-        <div id="resultado"></div>
-
-<div id="areaAdmin" style="display: none; margin-top: 30px;">
-    <input
-        type="password"
-        id="senhaAdmin"
-        placeholder="Senha de administrador"
-    >
-
-    <button onclick="confirmarAtualizacao()">
-        CONTINUAR
-    </button>
-</div>
-
-    <div id="areaAdmin" style="display: none; margin-top: 30px;">
-        <input
-            type="password"
-            id="senhaAdmin"
-            placeholder="Senha de administrador"
-        >
-
-        <button onclick="confirmarAtualizacao()">
-            CONTINUAR
-        </button>
+    <div class="subtitulo">
+        Consulte onde a peça está armazenada
     </div>
 
+    <input
+        id="codigo"
+        type="text"
+        placeholder="Digite o código da peça"
+        autocomplete="off"
+    >
+
+    <button
+        class="btn-buscar"
+        onclick="buscarPeca()"
+    >
+        BUSCAR PEÇA
+    </button>
+
+    <div id="resultado"></div>
+
+    <div id="areaAdmin">
 
         <button
-            onclick="document.getElementById('areaAdmin').style.display='block'"
-            style="margin-top: 40px; background: #777;"
+            id="botaoAtualizar"
+            class="btn-admin"
+            onclick="iniciarAtualizacao()"
         >
             ATUALIZAR BASE DE PEÇAS
         </button>
 
+        <input
+            id="arquivoPlanilha"
+            type="file"
+            accept=".xlsx,.xls"
+        >
+
+        <div
+            id="statusAtualizacao"
+            class="status"
+        ></div>
+
     </div>
 
-<script>
-    
-  let pecas = [];
+</div>
 
-fetch("pecas.csv")
-    .then(resposta => resposta.text())
-    .then(texto => {
-        const linhas = texto.trim().split("\n");
-
-        pecas = linhas.slice(1).map(linha => {
-            const [codigo, descricao, local] = linha.split(",");
-
-            return {
-                codigo: codigo.trim(),
-                descricao: descricao.trim(),
-                local: local.trim()
-            };
-        });
-
-        console.log("Base compartilhada carregada:", pecas.length, "peças");
-    });   
-
-</script>
 
 <script>
-     
-</script>
 
-    <script>
+    const campoCodigo =
+        document.getElementById("codigo");
 
-async function carregarExcel(event) {
+    const resultado =
+        document.getElementById("resultado");
 
-    const arquivo = event.target.files[0];
+    const arquivoPlanilha =
+        document.getElementById("arquivoPlanilha");
 
-    if (!arquivo) return;
+    const statusAtualizacao =
+        document.getElementById("statusAtualizacao");
 
-    const dados = new FormData();
-    dados.append("planilha", arquivo);
-    dados.append("senha", senhaAdmin);
+    const botaoAtualizar =
+        document.getElementById("botaoAtualizar");
 
-    try {
-        const resposta = await fetch("/atualizar", {
-            method: "POST",
-            body: dados
-        });
 
-        const mensagem = await resposta.text();
+    // =====================================================
+    // ENTER PARA BUSCAR
+    // =====================================================
 
-        if (!resposta.ok) {
-            alert("Erro: " + mensagem);
-            return;
-        }
+    campoCodigo.addEventListener(
+        "keydown",
+        function(evento) {
 
-        alert("Base atualizada para todos os aparelhos!");
-
-        location.reload();
-
-    } catch (erro) {
-        alert("Erro ao atualizar a base.");
-        console.error(erro);
-    }
-}
-
-let senhaAdmin = "";
-
-async function confirmarAtualizacao() {
-
-    senhaAdmin = document.getElementById("senhaAdmin").value;
-
-    if (senhaAdmin === "") {
-        alert("Digite a senha.");
-        return;
-    }
-
-    try {
-        const resposta = await fetch("/verificar-senha", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
-            body: JSON.stringify({
-                senha: senhaAdmin
-            })
-        });
-
-        if (!resposta.ok) {
-            alert("Senha incorreta.");
-            return;
-        }
-
-        document.getElementById("arquivoExcel").click();
-
-    } catch (erro) {
-        alert("Erro ao verificar a senha.");
-    }
-}   
-
-         async function buscarPeca() {
-
-            const codigoDigitado =
-                document.getElementById("codigo").value.trim();
-
-            const resultado =
-                document.getElementById("resultado");
-
-            if (codigoDigitado === "") {
-                resultado.innerHTML =
-                    '<div class="erro">Digite um código de peça.</div>';
-                return;
+            if (evento.key === "Enter") {
+                buscarPeca();
             }
+        }
+    );
 
-            const resposta = await fetch(
-    "/api/peca?codigo=" + encodeURIComponent(codigoDigitado)
-);
 
-const dados = await resposta.json();
+    // =====================================================
+    // BUSCAR PEÇA NO SUPABASE ATRAVÉS DO SERVIDOR
+    // =====================================================
 
-const pecasEncontradas = dados.pecas || [];
+    async function buscarPeca() {
 
-              if (pecasEncontradas.length === 0) {
+        const codigo =
+            campoCodigo.value.trim();
+
+        resultado.innerHTML = "";
+
+        if (!codigo) {
+            return;
+        }
+
+        try {
+
+            const resposta =
+                await fetch(
+                    "/api/peca?codigo=" +
+                    encodeURIComponent(codigo)
+                );
+
+            const dados =
+                await resposta.json();
+
+            if (
+                !resposta.ok ||
+                !dados.sucesso
+            ) {
 
                 resultado.innerHTML =
-                    '<div class="erro">❌ Peça não encontrada.</div>';
+                    '<div class="nao-encontrada">' +
+                    'Erro ao consultar a base de peças.' +
+                    '</div>';
 
                 return;
             }
 
-            resultado.innerHTML = pecasEncontradas.map(peca => `
-    <div class="peca">
-        <div class="codigo">
-            ${peca.codigo}
-        </div>
-        <div class="descricao">
-            ${peca.descricao}
-        </div>
-        <div class="local">
-            📍 ${peca.local}
-        </div>
-    </div>
-`).join("");
+
+            if (
+                !dados.pecas ||
+                dados.pecas.length === 0
+            ) {
+
+                resultado.innerHTML =
+                    '<div class="nao-encontrada">' +
+                    '✕ Peça não encontrada.' +
+                    '</div>';
+
+                return;
+            }
+
+
+            resultado.innerHTML =
+                dados.pecas
+                    .map(
+                        peca => `
+                            <div class="resultado-card">
+
+                                <p>
+                                    <strong>Código:</strong>
+                                    ${escaparHtml(peca.codigo)}
+                                </p>
+
+                                <p>
+                                    <strong>Descrição:</strong>
+                                    ${escaparHtml(peca.descricao)}
+                                </p>
+
+                                <p>
+                                    <strong>Local:</strong>
+                                    ${escaparHtml(peca.local)}
+                                </p>
+
+                            </div>
+                        `
+                    )
+                    .join("");
+
+        } catch (erro) {
+
+            console.error(
+                "Erro na consulta:",
+                erro
+            );
+
+            resultado.innerHTML =
+                '<div class="nao-encontrada">' +
+                'Erro ao consultar a base de peças.' +
+                '</div>';
+        }
+    }
+
+
+    // =====================================================
+    // INICIAR ATUALIZAÇÃO
+    // =====================================================
+
+    async function iniciarAtualizacao() {
+
+        statusAtualizacao.textContent = "";
+        statusAtualizacao.className = "status";
+
+        const senha =
+            prompt(
+                "Digite a senha para atualizar a base:"
+            );
+
+        if (senha === null) {
+            return;
         }
 
-        document
-            .getElementById("codigo")
-            .addEventListener("keydown", function(event) {
 
-                if (event.key === "Enter") {
-                    buscarPeca();
+        try {
+
+            const resposta =
+                await fetch(
+                    "/verificar-senha",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json"
+                        },
+
+                        body: JSON.stringify({
+                            senha: senha
+                        })
+                    }
+                );
+
+
+            if (!resposta.ok) {
+
+                alert("Senha incorreta.");
+                return;
+            }
+
+
+            const dados =
+                await resposta.json();
+
+
+            if (!dados.correta) {
+
+                alert("Senha incorreta.");
+                return;
+            }
+
+
+            // Guardamos a senha somente para este envio.
+            arquivoPlanilha.dataset.senha =
+                senha;
+
+
+            arquivoPlanilha.value = "";
+
+            arquivoPlanilha.click();
+
+
+        } catch (erro) {
+
+            console.error(
+                "Erro ao verificar senha:",
+                erro
+            );
+
+            alert(
+                "Não foi possível verificar a senha."
+            );
+        }
+    }
+
+
+    // =====================================================
+    // QUANDO USUÁRIO ESCOLHER A PLANILHA
+    // =====================================================
+
+    arquivoPlanilha.addEventListener(
+        "change",
+        async function() {
+
+            const arquivo =
+                arquivoPlanilha.files[0];
+
+            if (!arquivo) {
+                return;
+            }
+
+
+            const senha =
+                arquivoPlanilha.dataset.senha;
+
+
+            if (!senha) {
+
+                alert(
+                    "Sessão de atualização inválida."
+                );
+
+                return;
+            }
+
+
+            statusAtualizacao.textContent =
+                "Atualizando base de peças...";
+
+            statusAtualizacao.className =
+                "status atualizando";
+
+
+            botaoAtualizar.disabled = true;
+
+
+            const formData =
+                new FormData();
+
+
+            formData.append(
+                "senha",
+                senha
+            );
+
+
+            formData.append(
+                "planilha",
+                arquivo
+            );
+
+
+            try {
+
+                const resposta =
+                    await fetch(
+                        "/atualizar",
+                        {
+                            method: "POST",
+                            body: formData
+                        }
+                    );
+
+
+                const mensagem =
+                    await resposta.text();
+
+
+                if (!resposta.ok) {
+
+                    statusAtualizacao.textContent =
+                        "Erro na atualização.";
+
+                    statusAtualizacao.className =
+                        "status erro";
+
+
+                    alert(
+                        "Erro: " + mensagem
+                    );
+
+                    return;
                 }
 
-            });
 
-    </script>
+                statusAtualizacao.textContent =
+                    mensagem;
+
+                statusAtualizacao.className =
+                    "status sucesso";
+
+
+                alert(mensagem);
+
+
+            } catch (erro) {
+
+                console.error(
+                    "Erro ao atualizar:",
+                    erro
+                );
+
+
+                statusAtualizacao.textContent =
+                    "Erro na atualização.";
+
+                statusAtualizacao.className =
+                    "status erro";
+
+
+                alert(
+                    "Erro ao enviar a planilha."
+                );
+
+
+            } finally {
+
+                botaoAtualizar.disabled =
+                    false;
+
+                arquivoPlanilha.value =
+                    "";
+
+                delete arquivoPlanilha.dataset.senha;
+            }
+        }
+    );
+
+
+    // =====================================================
+    // PROTEÇÃO BÁSICA DO HTML
+    // =====================================================
+
+    function escaparHtml(valor) {
+
+        return String(valor ?? "")
+            .replaceAll("&", "&amp;")
+            .replaceAll("<", "&lt;")
+            .replaceAll(">", "&gt;")
+            .replaceAll('"', "&quot;")
+            .replaceAll("'", "&#039;");
+    }
+
+</script>
 
 </body>
 </html>
