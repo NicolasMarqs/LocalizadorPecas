@@ -1,7 +1,10 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
+
 <head>
+
     <meta charset="UTF-8">
+
     <meta
         name="viewport"
         content="width=device-width, initial-scale=1.0"
@@ -9,9 +12,8 @@
 
     <title>Localizador de Peças | Online</title>
 
-    <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
-
     <style>
+
         * {
             box-sizing: border-box;
         }
@@ -110,6 +112,11 @@
             cursor: pointer;
         }
 
+        .btn-admin:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
         #arquivoPlanilha {
             display: none;
         }
@@ -135,6 +142,7 @@
         }
 
         @media (max-width: 600px) {
+
             .container {
                 padding-top: 18px;
             }
@@ -142,19 +150,26 @@
             h1 {
                 font-size: 26px;
             }
+
         }
+
     </style>
+
 </head>
+
 
 <body>
 
 <div class="container">
 
-    <h1>Localizador de Peças</h1>
+    <h1>
+        Localizador de Peças
+    </h1>
 
     <div class="subtitulo">
         Consulte onde a peça está armazenada
     </div>
+
 
     <input
         id="codigo"
@@ -163,6 +178,7 @@
         autocomplete="off"
     >
 
+
     <button
         class="btn-buscar"
         onclick="buscarPeca()"
@@ -170,7 +186,9 @@
         BUSCAR PEÇA
     </button>
 
+
     <div id="resultado"></div>
+
 
     <div id="areaAdmin">
 
@@ -182,11 +200,13 @@
             ATUALIZAR BASE DE PEÇAS
         </button>
 
+
         <input
             id="arquivoPlanilha"
             type="file"
             accept=".xlsx,.xls"
         >
+
 
         <div
             id="statusAtualizacao"
@@ -199,6 +219,10 @@
 
 
 <script>
+
+    // =====================================================
+    // ELEMENTOS DA TELA
+    // =====================================================
 
     const campoCodigo =
         document.getElementById("codigo");
@@ -227,12 +251,14 @@
             if (evento.key === "Enter") {
                 buscarPeca();
             }
+
         }
     );
 
 
     // =====================================================
-    // BUSCAR PEÇA NO SUPABASE ATRAVÉS DO SERVIDOR
+    // BUSCAR PEÇA
+    // CONSULTA O SUPABASE ATRAVÉS DO SERVIDOR
     // =====================================================
 
     async function buscarPeca() {
@@ -240,11 +266,14 @@
         const codigo =
             campoCodigo.value.trim();
 
+
         resultado.innerHTML = "";
+
 
         if (!codigo) {
             return;
         }
+
 
         try {
 
@@ -254,8 +283,10 @@
                     encodeURIComponent(codigo)
                 );
 
+
             const dados =
                 await resposta.json();
+
 
             if (
                 !resposta.ok ||
@@ -263,9 +294,11 @@
             ) {
 
                 resultado.innerHTML =
-                    '<div class="nao-encontrada">' +
-                    'Erro ao consultar a base de peças.' +
-                    '</div>';
+                    `
+                    <div class="nao-encontrada">
+                        Erro ao consultar a base de peças.
+                    </div>
+                    `;
 
                 return;
             }
@@ -277,9 +310,11 @@
             ) {
 
                 resultado.innerHTML =
-                    '<div class="nao-encontrada">' +
-                    '✕ Peça não encontrada.' +
-                    '</div>';
+                    `
+                    <div class="nao-encontrada">
+                        ✕ Peça não encontrada.
+                    </div>
+                    `;
 
                 return;
             }
@@ -311,6 +346,7 @@
                     )
                     .join("");
 
+
         } catch (erro) {
 
             console.error(
@@ -318,108 +354,95 @@
                 erro
             );
 
+
             resultado.innerHTML =
-                '<div class="nao-encontrada">' +
-                'Erro ao consultar a base de peças.' +
-                '</div>';
+                `
+                <div class="nao-encontrada">
+                    Erro ao consultar a base de peças.
+                </div>
+                `;
+
         }
+
     }
 
 
     // =====================================================
-    // INICIAR ATUALIZAÇÃO
+    // ATUALIZAR BASE
+    //
+    // ORDEM:
+    //
+    // 1 - CLICA NO BOTÃO
+    // 2 - PEDE SENHA
+    // 3 - ABRE SELETOR DE ARQUIVO
+    // 4 - SERVIDOR CONFERE SENHA
+    // 5 - ATUALIZA SUPABASE
     // =====================================================
 
-    async function iniciarAtualizacao() {
+    function iniciarAtualizacao() {
 
         statusAtualizacao.textContent = "";
-        statusAtualizacao.className = "status";
+
+        statusAtualizacao.className =
+            "status";
+
+
+        // PRIMEIRO PEDE A SENHA
 
         const senha =
             prompt(
                 "Digite a senha para atualizar a base:"
             );
 
-        if (senha === null) {
+
+        if (
+            senha === null ||
+            senha.trim() === ""
+        ) {
+
             return;
+
         }
 
 
-        try {
+        // GUARDA A SENHA TEMPORARIAMENTE
+        // SOMENTE PARA ESTE ENVIO
 
-            const resposta =
-                await fetch(
-                    "/verificar-senha",
-                    {
-                        method: "POST",
-
-                        headers: {
-                            "Content-Type":
-                                "application/json"
-                        },
-
-                        body: JSON.stringify({
-                            senha: senha
-                        })
-                    }
-                );
+        arquivoPlanilha.dataset.senha =
+            senha;
 
 
-            if (!resposta.ok) {
+        // LIMPA SELEÇÃO ANTERIOR
 
-                alert("Senha incorreta.");
-                return;
-            }
+        arquivoPlanilha.value = "";
 
 
-            const dados =
-                await resposta.json();
+        // DEPOIS DA SENHA ABRE A PASTA
 
+        arquivoPlanilha.click();
 
-            if (!dados.correta) {
-
-                alert("Senha incorreta.");
-                return;
-            }
-
-
-            // Guardamos a senha somente para este envio.
-            arquivoPlanilha.dataset.senha =
-                senha;
-
-
-            arquivoPlanilha.value = "";
-
-            arquivoPlanilha.click();
-
-
-        } catch (erro) {
-
-            console.error(
-                "Erro ao verificar senha:",
-                erro
-            );
-
-            alert(
-                "Não foi possível verificar a senha."
-            );
-        }
     }
 
 
     // =====================================================
-    // QUANDO USUÁRIO ESCOLHER A PLANILHA
+    // PLANILHA SELECIONADA
     // =====================================================
 
     arquivoPlanilha.addEventListener(
         "change",
         async function() {
 
+
             const arquivo =
                 arquivoPlanilha.files[0];
 
+
             if (!arquivo) {
+
+                delete arquivoPlanilha.dataset.senha;
+
                 return;
+
             }
 
 
@@ -434,18 +457,29 @@
                 );
 
                 return;
+
             }
 
 
+            // =================================================
+            // MOSTRAR STATUS
+            // =================================================
+
             statusAtualizacao.textContent =
                 "Atualizando base de peças...";
+
 
             statusAtualizacao.className =
                 "status atualizando";
 
 
-            botaoAtualizar.disabled = true;
+            botaoAtualizar.disabled =
+                true;
 
+
+            // =================================================
+            // MONTAR ENVIO
+            // =================================================
 
             const formData =
                 new FormData();
@@ -465,12 +499,20 @@
 
             try {
 
+
+                // =============================================
+                // ENVIAR PARA O SERVIDOR
+                // =============================================
+
                 const resposta =
                     await fetch(
                         "/atualizar",
                         {
+
                             method: "POST",
+
                             body: formData
+
                         }
                     );
 
@@ -479,25 +521,39 @@
                     await resposta.text();
 
 
+                // =============================================
+                // ERRO
+                // =============================================
+
                 if (!resposta.ok) {
+
 
                     statusAtualizacao.textContent =
                         "Erro na atualização.";
+
 
                     statusAtualizacao.className =
                         "status erro";
 
 
                     alert(
-                        "Erro: " + mensagem
+                        "Erro: " +
+                        mensagem
                     );
 
+
                     return;
+
                 }
 
 
+                // =============================================
+                // SUCESSO
+                // =============================================
+
                 statusAtualizacao.textContent =
                     mensagem;
+
 
                 statusAtualizacao.className =
                     "status sucesso";
@@ -508,6 +564,7 @@
 
             } catch (erro) {
 
+
                 console.error(
                     "Erro ao atualizar:",
                     erro
@@ -516,6 +573,7 @@
 
                 statusAtualizacao.textContent =
                     "Erro na atualização.";
+
 
                 statusAtualizacao.className =
                     "status erro";
@@ -528,33 +586,66 @@
 
             } finally {
 
+
+                // =============================================
+                // LIBERAR BOTÃO NOVAMENTE
+                // =============================================
+
                 botaoAtualizar.disabled =
                     false;
+
 
                 arquivoPlanilha.value =
                     "";
 
+
                 delete arquivoPlanilha.dataset.senha;
+
             }
+
         }
     );
 
 
     // =====================================================
-    // PROTEÇÃO BÁSICA DO HTML
+    // PROTEÇÃO PARA TEXTO EXIBIDO
     // =====================================================
 
     function escaparHtml(valor) {
 
-        return String(valor ?? "")
-            .replaceAll("&", "&amp;")
-            .replaceAll("<", "&lt;")
-            .replaceAll(">", "&gt;")
-            .replaceAll('"', "&quot;")
-            .replaceAll("'", "&#039;");
+        return String(
+            valor ?? ""
+        )
+
+        .replaceAll(
+            "&",
+            "&amp;"
+        )
+
+        .replaceAll(
+            "<",
+            "&lt;"
+        )
+
+        .replaceAll(
+            ">",
+            "&gt;"
+        )
+
+        .replaceAll(
+            '"',
+            "&quot;"
+        )
+
+        .replaceAll(
+            "'",
+            "&#039;"
+        );
+
     }
 
 </script>
 
 </body>
+
 </html>
